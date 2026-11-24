@@ -12,6 +12,7 @@ You need Docker with Compose.
 
 ```bash
 cp .env.example .env
+[ -f app/.env ] || cp app/.env.example app/.env
 docker compose build
 docker compose up -d
 docker compose exec -T php composer install --no-interaction
