@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="App\Inventory\Domain\Reservation" table="inventory_reservation">
+        <id name="id" type="string" column="id" length="36" />
+        <many-to-one field="stock" target-entity="App\Inventory\Domain\Stock">
+            <join-column name="stock_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT" />
+        </many-to-one>
+        <field name="quantity" type="integer" column="quantity" />
+        <field name="status" type="string" column="status" length="16" />
+    </entity>
+</doctrine-mapping>

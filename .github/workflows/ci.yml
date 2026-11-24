@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Inventory tests (PHP 8.4 / PostgreSQL 17)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure local environment
+        run: cp .env.example .env
+
+      - name: Build PHP image
+        run: docker compose build php
+
+      - name: Start application dependencies
+        run: docker compose up -d php
+
+      - name: Install PHP dependencies
+        run: docker compose exec -T php composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Apply development database migrations
+        run: docker compose exec -T php php bin/console doctrine:migrations:migrate --no-interaction
+
+      - name: Create and migrate test database
+        run: |
+          docker compose exec -T php php bin/console doctrine:database:create --if-not-exists --env=test
+          docker compose exec -T php php bin/console doctrine:migrations:migrate --env=test --no-interaction
+
+      - name: Validate Symfony container and Doctrine mapping
+        run: |
+          docker compose exec -T php php bin/console lint:container
+          docker compose exec -T php php bin/console doctrine:schema:validate
+
+      - name: Run unit, integration, and API tests
+        run: docker compose exec -T php php bin/phpunit

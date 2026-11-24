@@ -1,0 +1,15 @@
+.env
+/.env
+/.env.local
+/.env.*.local
+/app/.env.local
+/app/.env.*.local
+/app/vendor/
+/app/var/
+/app/.phpunit.cache/
+/.DS_Store
+**/.DS_Store
+/Thumbs.db
+/.idea/
+/app/.phpunit.cache/
+.DS_Store

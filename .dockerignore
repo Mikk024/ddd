@@ -1,0 +1,6 @@
+.git
+.env
+app/vendor
+app/var
+app/.phpunit.cache
+.DS_Store

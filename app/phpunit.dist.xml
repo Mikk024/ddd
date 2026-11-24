@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.5/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         cacheDirectory=".phpunit.cache"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true">
+    <php>
+        <env name="APP_ENV" value="test" force="true" />
+        <env name="APP_DEBUG" value="1" force="true" />
+    </php>
+    <testsuites>
+        <testsuite name="Inventory">
+            <directory>tests/Inventory</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

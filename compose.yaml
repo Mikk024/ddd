@@ -1,0 +1,137 @@
+name: stockflow
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    working_dir: /var/www/html
+    volumes:
+      - ./app:/var/www/html
+      - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_DEBUG: ${APP_DEBUG:-1}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-stockflow}:${POSTGRES_PASSWORD:-stockflow_dev_password}@postgres:5432/${POSTGRES_DB:-stockflow}?serverVersion=17&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "amqp://${RABBITMQ_DEFAULT_USER:-stockflow}:${RABBITMQ_DEFAULT_PASS:-stockflow_dev_password}@rabbitmq:5672/%2f/messages"
+      REDIS_URL: redis://redis:6379
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+      XDEBUG_CONFIG: client_host=host.docker.internal client_port=9003
+      PHP_IDE_CONFIG: serverName=stockflow
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+    networks:
+      - backend
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stockflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockflow_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-stockflow}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    hostname: stockflow-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-stockflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-stockflow_dev_password}
+    ports:
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    profiles: ["workers"]
+    working_dir: /var/www/html
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=256M", "-vv"]
+    restart: unless-stopped
+    volumes:
+      - ./app:/var/www/html
+      - ./docker/php/conf.d/app.ini:/usr/local/etc/php/conf.d/99-app.ini:ro
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-stockflow}:${POSTGRES_PASSWORD:-stockflow_dev_password}@postgres:5432/${POSTGRES_DB:-stockflow}?serverVersion=17&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "amqp://${RABBITMQ_DEFAULT_USER:-stockflow}:${RABBITMQ_DEFAULT_PASS:-stockflow_dev_password}@rabbitmq:5672/%2f/messages"
+      REDIS_URL: redis://redis:6379
+      XDEBUG_MODE: off
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  backend:
+    driver: bridge
